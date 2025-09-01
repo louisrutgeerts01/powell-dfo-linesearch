@@ -12,9 +12,9 @@ from src.powell import powell
 from src.functions import FUNCTIONS as FUNC_MAP  # dict[name -> callable]
 
 # ---------------- Sidebar controls ----------------
-st.set_page_config(page_title="Powell DFO Playground", layout="wide")
+st.set_page_config(page_title="Powell DFO", layout="wide")
 
-st.sidebar.title("Powell’s Method — Playground")
+st.sidebar.title("Powell’s Method")
 func_name = st.sidebar.selectbox("Objective function", sorted(FUNC_MAP.keys()), index=sorted(FUNC_MAP.keys()).index("rosenbrock") if "rosenbrock" in FUNC_MAP else 0)
 
 # Sensible defaults per function
@@ -49,7 +49,7 @@ plot_enabled = st.sidebar.checkbox("Show contour plot (2D only)", value=True)
 run_btn = st.sidebar.button("Run Powell")
 
 # ---------------- Main panel ----------------
-st.title("Powell’s Direction-Set Method (Derivative-Free)")
+st.title("Powell’s Direction-Set Method")
 
 st.markdown(
     """
@@ -67,14 +67,14 @@ D0 = np.eye(n)
 
 # Cache heavy contour grids so the UI is snappy
 @st.cache_data(show_spinner=False)
-def contour_grid(func_name: str, fcallable, xr, yr, resolution=400):
+def contour_grid(func_name: str, _fcallable, xr, yr, resolution=400):
     X = np.linspace(*xr, resolution)
     Y = np.linspace(*yr, resolution)
     XX, YY = np.meshgrid(X, Y)
     ZZ = np.zeros_like(XX)
     for i in range(XX.shape[0]):
         for j in range(XX.shape[1]):
-            ZZ[i, j] = fcallable(np.array([XX[i, j], YY[i, j]]))
+            ZZ[i, j] = _fcallable(np.array([XX[i, j], YY[i, j]]))
     return X, Y, XX, YY, ZZ
 
 # Heuristic plotting ranges for 2D
@@ -92,8 +92,13 @@ RANGES = {
 
 # Run
 if run_btn:
+    path = []
+    def _rec(x, fx, stage):
+        if x.shape[0] >= 2:
+            path.append((float(x[0]), float(x[1])))
+
     start = time.perf_counter()
-    x_star = powell(f, x0, D0, tol=tol, max_iter=max_iter)
+    x_star = powell(f, x0, D0, tol=tol, max_iter=max_iter, callback=_rec)
     elapsed = time.perf_counter() - start
     f_star = float(f(x_star))
 
@@ -135,6 +140,10 @@ if run_btn:
         ax.clabel(cs, inline=1, fontsize=8)
         ax.plot([x0[0]], [x0[1]], 'o', label='start')
         ax.plot([x_star[0]], [x_star[1]], '*', markersize=12, label='final')
+        if len(path) >= 2:
+            xs, ys = zip(*path)
+            ax.plot(xs, ys, '-', linewidth=1.5, label='path')
+            ax.scatter(xs, ys, s=12)
         ax.set_title(f"Powell on {func_name}")
         ax.set_xlabel('x1'); ax.set_ylabel('x2')
         ax.legend()
